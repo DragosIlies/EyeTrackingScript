@@ -37,16 +37,35 @@ def get_gambles():
         
     op = op.drop(op[(op.GazePointX < 0) & (op.GazePointY < 0)].index)
     
-    return op #Return the database with all the gambles
+    return op
 
 
+
+
+def get_fixations():
+    opListX = op["GazePointX"].tolist()
+    opListY = op["GazePointY"].tolist()
+    opListT = op["TimeStamp"].tolist()
     
-start = time.time()           
-op = get_gambles()
-end = time.time()  
+    
+    results = fixation_detection(opListX, opListY, opListT, missing=0.0, maxdist=25, mindur=20)
+    fixations = results[1]
+    return fixations
+           
 
-#Export the dataset
-op.to_csv("output_file.csv",index = True)
+op = get_gambles()
+fixations = get_fixations()
+
+
+
+
+
+op_all_fixations = pd.DataFrame(fixations)
+op_all_fixations.columns = ["starttime","endtime","duration","endx","endy"]
+op_all_fixations.to_csv("All_Fixations.csv",index = True)
+
+
+
 
 
 

@@ -35,18 +35,49 @@ def get_gambles():
         last_gamble_index = (f[1]) # take the second tuple value - end gamble
         op = op.append(et.iloc[first__gamble_index:last_gamble_index]) 
         
+        break
+        
     op = op.drop(op[(op.GazePointX < 0) & (op.GazePointY < 0)].index)
     
-    return op #Return the database with all the gambles
-
-
+    return op
     
-start = time.time()           
-op = get_gambles()
-end = time.time()  
+    
+
+
+def get_fixations():
+    opListX = op["GazePointX"].tolist()
+    opListY = op["GazePointY"].tolist()
+    opListT = op["TimeStamp"].tolist()
+    results = fixation_detection(opListX, opListY, opListT, missing=0.0, maxdist=25, mindur=20)
+    fixations = results[1]
+    return fixations
+    
+
+ 
+          
+
+testing = get_gambles()
+
+op = testing
+
+#fixations = testing[1]
+fixations = get_fixations()
+
+op_oneTrial =  pd.DataFrame()
+
+op_oneTrial = pd.DataFrame(fixations)
+
+op_oneTrial.columns = ["starttime","endtime","duration","endx","endy"]
+
 
 #Export the dataset
-op.to_csv("output_file.csv",index = True)
+op_oneTrial.to_csv("Trial1_Fixations.csv",index = True)
+    
+    
+
+
+
+
 
 
 
