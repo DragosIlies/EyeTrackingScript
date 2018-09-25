@@ -62,6 +62,11 @@ fixations = get_fixations()
 
 
 end = time.time()
+
+
+op2 = pd.DataFrame(fixations)
+op2.columns = ["starttime","endtime","duration","endx","endy"]
+op2.to_csv("All_Fixations.csv",index = True)
 print(end - start)
 
 
