@@ -82,6 +82,8 @@ def main():
     AOI_Q = []
     AOI_X = []
     AOI_Y = []
+    
+    subject_values = []
 
     
     #loop through the gambles indexes pairs and add them to a data       
@@ -110,12 +112,18 @@ def main():
                 AOI_X.append(duration)
             elif 800 <= endx <= 1000 and 600 <= endy <= 800: # AOI Y*
                 AOI_Y.append(duration)
+        
+        result = get_AOI_MT(AOI_P,AOI_Q,AOI_X,AOI_Y)
+        subject_values.append(result)
+        
+                
+            
 
     #When we processed all the fixations then get the meansfix and totalfix for all
                                                                 # the AOIs
-    result = get_AOI_MT(AOI_P,AOI_Q,AOI_X,AOI_Y)
     
-    return result
+    
+    return subject_values #result
     #Subject finished
 
 
@@ -124,9 +132,9 @@ def main():
 
 
 #Main       
-result = main()
+op = main()
 
-subject_15 = pd.DataFrame([result])
+subject_15 = pd.DataFrame(op)
 subject_15.columns = ["p_Meanfix","q_Meanfix","x_Meanfix","y_Meanfix","p_TotalFix","q_TotalFix","x_TotalFix","y_TotalFix"]
 
 end = time.time()  
