@@ -13,7 +13,12 @@ op = pd.DataFrame()
 beh = beh.loc[:,["CBcond","Gamble","domain","X_location","risk_selected"]]
 et = et.loc[:,["TimeStamp","Event","GazePointX","GazePointY"]]
 
+#et = et.drop(et[(et.GazePointX < 0) & (et.GazePointY < 0)].index)
 
+et = et[~(et['GazePointY'] < 0)]
+et = et[~(et['GazePointX'] < 0)]
+
+et = et.reset_index(drop=True)
 
 def get_gambles():
     trials = [] # Here we store the tuples
@@ -35,7 +40,7 @@ def get_gambles():
         last_gamble_index = (f[1]) # take the second tuple value - end gamble
         op = op.append(et.iloc[first__gamble_index:last_gamble_index]) 
         
-    op = op.drop(op[(op.GazePointX < 0) & (op.GazePointY < 0)].index)
+    #op = op.drop(op[(op.GazePointX < 0) & (op.GazePointY < 0)].index)
     
     return op
 
@@ -62,7 +67,7 @@ fixations = get_fixations()
 
 op_all_fixations = pd.DataFrame(fixations)
 op_all_fixations.columns = ["starttime","endtime","duration","endx","endy"]
-op_all_fixations.to_csv("All_Fixations.csv",index = True)
+op_all_fixations.to_csv("All_fixations.csv",index = True)
 
 
 

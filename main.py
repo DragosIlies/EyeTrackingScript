@@ -20,7 +20,10 @@ op = pd.DataFrame()
 beh = beh.loc[:,["CBcond","Gamble","domain","X_location","risk_selected"]]
 et = et.loc[:,["TimeStamp","Event","GazePointX","GazePointY"]]
 
-et = et.drop(et[(et.GazePointX < 0) & (et.GazePointY < 0)].index)
+#et = et.drop(et[(et.GazePointX < 0) & (et.GazePointY < 0)].index)
+
+et = et[~(et['GazePointY'] < 0)]
+et = et[~(et['GazePointX'] < 0)]
 et = et.reset_index(drop=True)
 
 
@@ -36,19 +39,19 @@ def get_fixations(df): #GEt the fixations for the given dataframe
     return fixations
 
 
-def get_AOI_MT(AOI_P,AOI_Q,AOI_X,AOI_Y): #Return the processed AOIs 
+def get_AOI_MT(AOI_p,AOI_q,AOI_x,AOI_y): #Return the processed AOIs 
     #calculate the means
-    p_Meanfix = mean(AOI_P)  
-    q_Meanfix = mean(AOI_Q)
-    x_Meanfix = mean(AOI_X)
-    y_Meanfix = mean(AOI_Y) 
+    p_Meanfix = mean(AOI_p)  
+    q_Meanfix = mean(AOI_q)
+    x_Meanfix = mean(AOI_x)
+    y_Meanfix = mean(AOI_y) 
     
     
     #calculate the length
-    p_TotalFix = len(AOI_P)
-    q_TotalFix = len(AOI_Q)
-    x_TotalFix = len(AOI_X)
-    y_TotalFix = len(AOI_Y)
+    p_TotalFix = len(AOI_p)
+    q_TotalFix = len(AOI_q)
+    x_TotalFix = len(AOI_x)
+    y_TotalFix = len(AOI_y)
     
     return [p_Meanfix,q_Meanfix,x_Meanfix,y_Meanfix,p_TotalFix,q_TotalFix,x_TotalFix,y_TotalFix]
 
@@ -75,14 +78,15 @@ def get_trial_from_indexes(f):
 
 
     
-    
+
+
 
 def main(): 
-    AOI_P = []
-    AOI_Q = []
-    AOI_X = []
-    AOI_Y = []
-    
+    AOI_p = []
+    AOI_q = []
+    AOI_x = []
+    AOI_y = []
+    c = 0
     subject_values = []
 
     
@@ -96,7 +100,7 @@ def main():
 
         fixations = get_fixations(op) 
 
-
+        x_loc = beh.at[c,"X_location"]
         #Loop though the fixations
         for f in fixations:
             endx = f[3]
@@ -104,23 +108,73 @@ def main():
             duration = f[2]
             
             # Determine in which AOI should the fixation be
-            if 800  <= endx <= 1000 and 400 <= endy <= 600: # AOI P
-                AOI_P.append(duration)
-            elif 800 <= endx <= 1000 and 400 <= endy <= 600: # AOI Q*
-                AOI_Q.append(duration)
-            elif 800 <= endx <= 1000 and 600 <= endy <= 800: # AOI X
-                AOI_X.append(duration)
-            elif 800 <= endx <= 1000 and 600 <= endy <= 800: # AOI Y*
-                AOI_Y.append(duration)
-        
-        result = get_AOI_MT(AOI_P,AOI_Q,AOI_X,AOI_Y)
-        subject_values.append(result)
-        
+            if 800  <= endx <= 1000 and 400 <= endy <= 600: # AOI 1
+                if x_loc == 1:
+                    AOI_p.append(duration)
+                    #Add to AOI_p 
+                elif x_loc == 2:
+                    AOI_x.append(duration)
+                    #add to AOI_x 
+                elif x_loc == 3:
+                    AOI_q.append(duration)
+                    #add to AOI Q 
+                elif x_loc == 4:
+                    AOI_y.append(duration)
+                    #add to AOI y 
                 
-            
+   
+            elif 800 <= endx <= 1000 and 400 <= endy <= 600: # AOI 2*
+                if x_loc == 1:
+                    AOI_x.append(duration)
+                    #add to aoi x 
+                elif x_loc == 2:
+                    AOI_p.append(duration)
+                    #add to aoi p 
+                elif x_loc == 3:
+                    AOI_y.append(duration)
+                    #add to aoi y 
+                elif x_loc == 4:
+                    AOI_q.append(duration)
+                    #add to q AOI
 
-    #When we processed all the fixations then get the meansfix and totalfix for all
-                                                                # the AOIs
+            elif 800 <= endx <= 1000 and 600 <= endy <= 800: # AOI 3
+                if x_loc == 1:
+                    AOI_q.append(duration)
+                    #add to aoi q 
+                elif x_loc == 2:
+                    AOI_y.append(duration)
+                    #add to y
+                elif x_loc == 3:
+                    AOI_p.append(duration)
+                    #add to p
+                elif x_loc == 4:
+                    AOI_x.append(duration)
+                    #add to x
+
+            elif 800 <= endx <= 1000 and 600 <= endy <= 800: # AOI 4*
+                if x_loc == 1:
+                    AOI_y.append(duration)
+                    #add to y
+                elif x_loc == 2:
+                    AOI_q.append(duration)
+                    #add to q
+                elif x_loc == 3:
+                    AOI_x.append(duration)
+                    #add to x
+                elif x_loc == 4:
+                    AOI_p.append(duration)
+                    #add to p
+        
+        domain = beh.at[c,"domain"]
+        gamble_nr = beh.at[c,"Gamble"]   
+        risk = beh.at[c,"risk_selected"]
+        subject = 15
+                
+        AOIs = get_AOI_MT(AOI_p,AOI_q,AOI_x,AOI_y)
+        result = [subject] + [gamble_nr] + [domain] + AOIs + [risk]
+        subject_values.append(result)
+        c += 1
+
     
     
     return subject_values #result
@@ -131,11 +185,11 @@ def main():
 
 
 
-#Main       
+#Main     
 op = main()
 
 subject_15 = pd.DataFrame(op)
-subject_15.columns = ["p_Meanfix","q_Meanfix","x_Meanfix","y_Meanfix","p_TotalFix","q_TotalFix","x_TotalFix","y_TotalFix"]
+subject_15.columns = ["Subject","Gamble","Domain","p_Meanfix","q_Meanfix","x_Meanfix","y_Meanfix","p_TotalFix","q_TotalFix","x_TotalFix","y_TotalFix","risk_selected"]
 
 end = time.time()  
 print("Program ended and it took: ",end-start)
