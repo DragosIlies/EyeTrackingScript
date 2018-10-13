@@ -2,27 +2,13 @@ import time
 import pandas as pd
 import numpy as np
 from detectors import *
+import re
+import os
 
 
 
 
 start = time.time() 
-
-#Load and create the dataframes
-et = pd.read_csv("eye_tracking_data.csv")
-beh = pd.read_csv("behavioural_data.csv")
-op = pd.DataFrame()
-    
-#Slice it and take what we need and then clean it
-beh = beh.loc[:,["CBcond","Gamble","domain","X_location","risk_selected","response_time"]]
-et = et.loc[:,["TimeStamp","Event","GazePointX","GazePointY"]]
-    
-#et = et.drop(et[(et.GazePointX < 0) & (et.GazePointY < 0)].index)
-    
-#et = et[~(et['GazePointY'] < 0)]
-#et = et[~(et['GazePointX'] < 0)]
-#et = et.reset_index(drop=True)
-    
 
     
 def mean(numbers):
@@ -35,21 +21,7 @@ def get_subject_nr(subject_path):
 
 
 
-def get_fixations(df): #GEt the fixations for the given dataframe
-    dfListX = df["GazePointX"].tolist()
-    dfListY = df["GazePointY"].tolist()
-    dfListT = df["TimeStamp"].tolist()
     
-    results = fixation_detection(dfListX, dfListY, dfListT, missing=0.0, maxdist=25, mindur=16.7)
-    fixations = results[1]
-    for b in fixations:
-        #print(b[3],b[4])
-        if b[3] < 0 or b[4] < 0:
-            print("Deleted one")
-            fixations.remove(b)
-
-    return fixations
-
 
 def get_AOI_MT(AOI_p,AOI_q,AOI_x,AOI_y): #Return the processed AOIs 
     #calculate the means
@@ -67,33 +39,32 @@ def get_AOI_MT(AOI_p,AOI_q,AOI_x,AOI_y): #Return the processed AOIs
     
     return [p_Meanfix,q_Meanfix,x_Meanfix,y_Meanfix,p_TotalFix,q_TotalFix,x_TotalFix,y_TotalFix]
 
-def get_trials_indexes(df):
-    #Loop though the indexes and take only the indexes the start and end gamble
-    trials = [] # Here we store the tuples with the start-end indexes
-    ph = 0 #A place holder for start-gamble index
-    for i in df.index:
-        val = et.at[i,"Event"] # The value at the current cell
-        if "gamble" in str(val):       
-            if ph != 0:   # if ph !=0 then ph is start-gamble
-                trials.append((ph,i)) #Append the ph and the current index
-                ph = 0 #Reset
-            else: # If ph is 0 then take the index of start-gamble
-                ph = i 
-    return trials
 
-def get_trial_from_indexes(f):
+def main(et_path,beh_path):
     
-    first_gamble_index = f[0]+1 # take the first tuple value - start-gamble
-    last_gamble_index = (f[1]) # take the second tuple value - end gamble
-    return pd.DataFrame(et.iloc[first_gamble_index:last_gamble_index])
+    subject_nr = get_subject_nr(beh_path)
+    #Load and create the dataframes
+    try:    #Try normally
+        print("Trying to process subject-",subject_nr)
+        et = pd.read_csv(et_path,sep="\t",skiprows=17)
+    except pd.errors.ParserError as e: #If it does not work
+        print("Got a problem reading it")
+        result = [f for f in re.split("[^0-9]", str(e)) if f != ''] #Find the largest number in the error
+        result = (max(map(int, result)))
+        et = pd.read_csv(et_path,sep="\t",skiprows=17,error_bad_lines=False) # read the database again and skip the error
+        et.at[result,"Event"] = "gamble" # Replace the faulty value with the end gamble using our index
+    print("Finished with subject:",subject_nr)
+    beh = pd.read_csv(beh_path)
+    op = pd.DataFrame()
+        
+    #Slice it and take what we need and then clean it
+    beh = beh.loc[:,["CBcond","Gamble","domain","X_location","risk_selected","response_time"]]
+    et = et.loc[:,["TimeStamp","Event","GazePointX","GazePointY"]]
+        
+    #et = et.drop(et[(et.GazePointX < 0) & (et.GazePointY < 0)].index)
+
+    print("Finished cleaning")
  
-
-
-    
-
-
-
-def main():  
     #Where we store the fixations
     AOI_p = []
     AOI_q = []
@@ -105,14 +76,53 @@ def main():
     subject_values = []
 
     
-    #loop through the gambles indexes pairs and add them to a data       
-    trials = get_trials_indexes(et)
+    #loop through the gambles indexes pairs and add them to a data     
+    #Loop though the indexes and take only the indexes the start and end gamble
+    trials = [] # Here we store the tuples with the start-end indexes
+    ph = 0 #A place holder for start-gamble index
+    print("Starting to create the trials")
+    for i in et.index:
+        val = et.at[i,"Event"] # The value at the current cell
+        if "gamble" in str(val):       
+            if ph != 0:   # if ph !=0 then ph is start-gamble
+                trials.append((ph,i)) #Append the ph and the current index
+                ph = 0 #Reset
+            else: # If ph is 0 then take the index of start-gamble
+                ph = i 
+    trials = trials
+    print("got the trials")
+    print(len(trials))
     for f in trials: 
+        
         #Using the tuple, use start index and end index to create a trial
-        op =  get_trial_from_indexes(f)
+        
+        first_gamble_index = f[0]+1 # take the first tuple value - start-gamble
+        last_gamble_index = (f[1]) # take the second tuple value - end gamble
+        op =  pd.DataFrame(et.iloc[first_gamble_index:last_gamble_index])
         
         #Get a list of fixations of the current  trial
-        fixations = get_fixations(op) 
+        dfListX = op["GazePointX"].tolist()
+        dfListY = op["GazePointY"].tolist()
+        dfListT = op["TimeStamp"].tolist()
+        #print("Subject is:",subject_nr)
+        dfListX =list(map(float, dfListX))
+        #print("wanna calculate fixations")
+        #print(list(map(float, dfListX)))
+        #print(dfListY)
+        #print(dfListT)
+            
+            
+        
+        results = fixation_detection(dfListX, dfListY, dfListT, missing=0.0, maxdist=25, mindur=16.7)
+        print("Finished fixations")
+        
+        fixations = results[1]
+        for b in fixations:
+            #print(b[3],b[4])
+            if b[3] < 0 or b[4] < 0:
+                print("Deleted one")
+                fixations.remove(b)
+        fixations = fixations 
 
         x_loc = beh.at[c,"X_location"]
         #Loop though the fixations
@@ -205,7 +215,7 @@ def main():
         domain = beh.at[c,"domain"]
         gamble_nr = beh.at[c,"Gamble"]   
         risk = beh.at[c,"risk_selected"]
-        subject_nr = 15
+        
                 
         AOIs = get_AOI_MT(AOI_p,AOI_q,AOI_x,AOI_y)
         
@@ -219,20 +229,56 @@ def main():
     #Subject finished
 
 
+def get_subjects():
+    fullList = os.listdir()
+    subject_numbers = {}
+    subject_pairs = []
+
+    for v in fullList:
+        if "subject" in v:
+            #print("Taking")
+            nr = get_subject_nr(v)
+            subject_numbers[v]=nr
+            
+    for key, value in subject_numbers.items():
+        for key2,value2 in subject_numbers.items(): #Loop though the dictionary
+            if key != key2: # If key are named differently
+                if value == value2:#If they have the same value
+                    if (key2,key) not in subject_pairs:
+                        subject_pairs.append((key,key2))
+                        #print(key,key2)
+    return subject_pairs
+        
+
+
+
+#Main
+'''
+finalDf = pd.DataFrame()
+op = main("subject-3_TOBII_output.tsv","subject-3.csv")
+#print(op)
+subject = pd.DataFrame(op)
+subject.columns = ["Subject","Gamble","Domain","p_Meanfix","q_Meanfix","x_Meanfix","y_Meanfix","p_TotalFix","q_TotalFix","x_TotalFix","y_TotalFix","risk_selected","response_time"]
+finalDf = pd.concat([finalDf, subject])
+'''
+  
+v = get_subjects()
+finalDf = pd.DataFrame() 
+for s in v:
+    et_path =s[1]
+    beh_path =s[0]
     
+    op = main(et_path,beh_path)
+    
+    subject = pd.DataFrame(op)
+    subject.columns = ["Subject","Gamble","Domain","p_Meanfix","q_Meanfix","x_Meanfix","y_Meanfix","p_TotalFix","q_TotalFix","x_TotalFix","y_TotalFix","risk_selected","response_time"]
+    
+    finalDf = pd.concat([finalDf, subject])
 
-
-
-#Main     
-op = main()
-
-subject_15 = pd.DataFrame(op)
-subject_15.columns = ["Subject","Gamble","Domain","p_Meanfix","q_Meanfix","x_Meanfix","y_Meanfix","p_TotalFix","q_TotalFix","x_TotalFix","y_TotalFix","risk_selected","response_time"]
-
-
+print("Finished with the program")
 
 #Export the dataset
-subject_15.to_csv("Subject-AOIs.csv", index = False)
+finalDf.to_csv("All-Subjects-AOIs.csv", index = False)
 
 
 end = time.time()  

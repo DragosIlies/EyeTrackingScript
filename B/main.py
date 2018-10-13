@@ -9,8 +9,8 @@ from detectors import *
 start = time.time() 
 
 #Load and create the dataframes
-et = pd.read_csv("eye_tracking_data.csv")
-beh = pd.read_csv("behavioural_data.csv")
+et = pd.read_csv("subject-7_TOBII_output.tsv",sep="\t",skiprows=17)
+beh = pd.read_csv("subject-7.csv")
 op = pd.DataFrame()
     
 #Slice it and take what we need and then clean it
@@ -39,15 +39,22 @@ def get_fixations(df): #GEt the fixations for the given dataframe
     dfListX = df["GazePointX"].tolist()
     dfListY = df["GazePointY"].tolist()
     dfListT = df["TimeStamp"].tolist()
+    print(dfListX)
+    
+    dfListX =list(map(float, dfListX))
+    print(dfListX)
+    print(dfListY)
+    print(dfListT)
     
     results = fixation_detection(dfListX, dfListY, dfListT, missing=0.0, maxdist=25, mindur=16.7)
     fixations = results[1]
+    
     for b in fixations:
-        #print(b[3],b[4])
         if b[3] < 0 or b[4] < 0:
-            print("Deleted one")
+            
             fixations.remove(b)
-
+            print("Deleted one")
+    
     return fixations
 
 
