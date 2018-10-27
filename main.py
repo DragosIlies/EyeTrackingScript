@@ -2,52 +2,106 @@ import time
 import pandas as pd
 import numpy as np
 from detectors import *
+import re
+import os
 
 
 
+#Misc
+def get_row_values(i,et,column_names):
+    temp_list = []
+    for column in column_names:
+        value = et.at[i,column] # The value at the current cell
+        temp_list.append(value)
 
-start = time.time() 
+    return temp_list
 
-#Load and create the dataframes
-et = pd.read_csv("eye_tracking_data.csv")
-beh = pd.read_csv("behavioural_data.csv")
-op = pd.DataFrame()
-    
-#Slice it and take what we need and then clean it
-beh = beh.loc[:,["CBcond","Gamble","domain","X_location","risk_selected","response_time"]]
-et = et.loc[:,["TimeStamp","Event","GazePointX","GazePointY"]]
-    
-#et = et.drop(et[(et.GazePointX < 0) & (et.GazePointY < 0)].index)
-    
-#et = et[~(et['GazePointY'] < 0)]
-#et = et[~(et['GazePointX'] < 0)]
-#et = et.reset_index(drop=True)
-    
-
-    
 def mean(numbers):
     return float(sum(numbers)) / max(len(numbers), 1)
 
-def get_subject_nr(subject_path):
+
+def get_subject_nr(subject_path): # Return the subject number from the file name
     return int(''.join(filter(str.isdigit, subject_path)))
 
 
+def get_subjects(): # Gets a list where every element is the subject beh and their et data
+    fullList = os.listdir()
+    subject_numbers = {}
+    subject_pairs = []
+
+    for v in fullList:
+        if "subject" in v:
+            nr = get_subject_nr(v)
+            subject_numbers[v]=nr
+            
+    for key, value in subject_numbers.items():
+        for key2,value2 in subject_numbers.items(): #Loop though the dictionary
+            if key != key2: # If key are named differently
+                if value == value2:#If they have the same value
+                    if (key2,key) not in subject_pairs:
+                        subject_pairs.append((key,key2))
+                        #print(key,key2)
+    return subject_pairs
+
+#Fix functions
+def replace_line(subject_path,badIndex): #Replace or remove the bad line of the file using the index
+    
+    #First open the current bad file and search for the error line
+    f=open(subject_path,"r")
+
+    data=f.readlines() 
+    badLine = data[badIndex-1]
+    del f
+    
+    if "gamble" in badLine: #If that bad line contains gamble then try to replace
+        #print("REPLACING")
+        template = "    "+"\t"+"gamble"
+        data[badIndex-1] = template
+        with open(subject_path, 'w') as fileG:
+            fileG.writelines(data)
+            del fileG
+
+    else: # If is not gamble then remove it
+        #print("REMOVING")
+        template = "    "											
+        data[badIndex-1] = template
+        with open(subject_path, 'w') as fileB:
+            fileB.writelines(data)
+            del fileB
+    
+
+def get_badIndex(e): # Get the index as integer from error
+    result = [f for f in re.split("[^0-9]", str(e)) if f != ''] 
+    return (max(map(int, result)))
 
 
+        
+def check_et(et_path,subject_nr): # This function will verify the et file for any problems
+    temp = False 
+    while temp == False: # Continuosly try to read the file, if worked then stop otherwise try to fix it
+        try:
+            et = pd.read_csv(et_path,sep="\t",skiprows=17)
+            temp = True
+        except pd.errors.ParserError as e:
+            print("Subject %d has a bad line, trying to fix."%subject_nr)
+            badIndex = get_badIndex(e) # Get the index of where the error was
+            replace_line(et_path,badIndex) # Replace the error line with good or bad
+            temp = False
+    return et
 
 def get_fixations(df): #GEt the fixations for the given dataframe
+    
     dfListX = df["GazePointX"].tolist()
     dfListY = df["GazePointY"].tolist()
     dfListT = df["TimeStamp"].tolist()
+    dfListX =list(map(float, dfListX))
+    dfListY =list(map(float, dfListY))
+    dfListT =list(map(float, dfListT))
+
     
     results = fixation_detection(dfListX, dfListY, dfListT, missing=0.0, maxdist=25, mindur=16.7)
     fixations = results[1]
-    for b in fixations:
-        #print(b[3],b[4])
-        if b[3] < 0 or b[4] < 0:
-            print("Deleted one")
-            fixations.remove(b)
-
+    
     return fixations
 
 
@@ -67,172 +121,228 @@ def get_AOI_MT(AOI_p,AOI_q,AOI_x,AOI_y): #Return the processed AOIs
     
     return [p_Meanfix,q_Meanfix,x_Meanfix,y_Meanfix,p_TotalFix,q_TotalFix,x_TotalFix,y_TotalFix]
 
-def get_trials_indexes(df):
-    #Loop though the indexes and take only the indexes the start and end gamble
-    trials = [] # Here we store the tuples with the start-end indexes
-    ph = 0 #A place holder for start-gamble index
-    for i in df.index:
-        val = et.at[i,"Event"] # The value at the current cell
-        if "gamble" in str(val):       
-            if ph != 0:   # if ph !=0 then ph is start-gamble
-                trials.append((ph,i)) #Append the ph and the current index
-                ph = 0 #Reset
-            else: # If ph is 0 then take the index of start-gamble
-                ph = i 
-    return trials
-
-def get_trial_from_indexes(f):
-    
-    first_gamble_index = f[0]+1 # take the first tuple value - start-gamble
-    last_gamble_index = (f[1]) # take the second tuple value - end gamble
-    return pd.DataFrame(et.iloc[first_gamble_index:last_gamble_index])
- 
-
-
-    
-
-
-
-def main():  
-    #Where we store the fixations
+def get_AOIs(fixations,x_loc):
     AOI_p = []
-    AOI_q = []
     AOI_x = []
+    AOI_q = []
     AOI_y = []
-    #Use c to take the current stuff we need at the current row
-    c = 0
-    #Where we store the dataframe of the subject
-    subject_values = []
-
-    
-    #loop through the gambles indexes pairs and add them to a data       
-    trials = get_trials_indexes(et)
-    for f in trials: 
-        #Using the tuple, use start index and end index to create a trial
-        op =  get_trial_from_indexes(f)
-        
-        #Get a list of fixations of the current  trial
-        fixations = get_fixations(op) 
-
-        x_loc = beh.at[c,"X_location"]
-        #Loop though the fixations
-        for f in fixations:
+    for f in fixations:
             endx = f[3]
             endy = f[4]
             duration = f[2]
             
             #AOI 1 coordonates
-            a1x_up = 880
-            a1y_up = 428
-            a1x_low = 720
-            a1y_low = 332
+            a1x_up = 944
+            a1y_up = 524
+            a1x_low = 656
+            a1y_low = 236
             
             #AOI 2 coordonates
-            a2x_up = 1200
-            a2y_up = 748
-            a2x_low = 1040
-            a2y_low = 332
+            a2x_up = 1264
+            a2y_up = 524
+            a2x_low = 976
+            a2y_low = 236
             #AOI 3 coordonates
-            a3x_up = 880
-            a3y_up = 748
-            a3x_low = 720
-            a3y_low = 652
+            a3x_up = 944
+            a3y_up = 844
+            a3x_low = 656
+            a3y_low = 556
             #AOI 4 coordonates
-            a4x_up = 1200
-            a4y_up = 748
-            a4x_low = 1040
-            a4y_low = 652
-
+            a4x_up = 1264
+            a4y_up = 844
+            a4x_low = 976
+            a4y_low = 556
+            
             
             # Determine in which AOI should the fixation be
             if a1x_low  <= endx <= a1x_up and a1y_low <= endy <= a1y_up: # AOI 1
                 if x_loc == 1:
                     AOI_p.append(duration)
+                    
                     #Add to AOI_p 
                 elif x_loc == 2:
                     AOI_x.append(duration)
+                    
                     #add to AOI_x 
                 elif x_loc == 3:
                     AOI_q.append(duration)
+                    
                     #add to AOI Q 
                 elif x_loc == 4:
                     AOI_y.append(duration)
                     #add to AOI y 
+                    
                 
    
             elif a2x_low  <= endx <= a2x_up and a2y_low <= endy <= a2y_up: # AOI 2*
                 if x_loc == 1:
                     AOI_x.append(duration)
                     #add to aoi x 
+                    
                 elif x_loc == 2:
                     AOI_p.append(duration)
                     #add to aoi p 
+                    
                 elif x_loc == 3:
                     AOI_y.append(duration)
                     #add to aoi y 
+                    
                 elif x_loc == 4:
                     AOI_q.append(duration)
                     #add to q AOI
+                    
 
             elif a3x_low  <= endx <= a3x_up and a3y_low <= endy <= a3y_up: # AOI 3
                 if x_loc == 1:
                     AOI_q.append(duration)
+                    
                     #add to aoi q 
                 elif x_loc == 2:
                     AOI_y.append(duration)
+                    
                     #add to y
                 elif x_loc == 3:
                     AOI_p.append(duration)
+                    
                     #add to p
                 elif x_loc == 4:
                     AOI_x.append(duration)
+                    
                     #add to x
 
             elif a4x_low  <= endx <= a4x_up and a4y_low <= endy <= a4y_up: # AOI 4*
                 if x_loc == 1:
                     AOI_y.append(duration)
+                    
                     #add to y
                 elif x_loc == 2:
                     AOI_q.append(duration)
+                    
                     #add to q
                 elif x_loc == 3:
                     AOI_x.append(duration)
+                    
                     #add to x
                 elif x_loc == 4:
                     AOI_p.append(duration)
-                    #add to p
-        response_time = beh.at[c,"response_time"]
-        domain = beh.at[c,"domain"]
-        gamble_nr = beh.at[c,"Gamble"]   
-        risk = beh.at[c,"risk_selected"]
-        subject_nr = 15
-                
-        AOIs = get_AOI_MT(AOI_p,AOI_q,AOI_x,AOI_y)
+        #
+    AOIs = get_AOI_MT(AOI_p,AOI_q,AOI_x,AOI_y)
+    return AOIs
+                    
         
-        result = [subject_nr] + [gamble_nr] + [domain] + AOIs + [risk]+[response_time]
-        subject_values.append(result)
-        c += 1
-
-    
-    
-    return subject_values #result
-    #Subject finished
-
-
+                    
+#Classes
     
 
+class Trial():
+    def __init__(self,first_index,last_index):
+        self.dataframe = self.create_dataframe(first_index,last_index)
+        
+        def create_dataframe(self,first_index,last_index):
+            return pd.DataFrame(self.et.iloc[(first_index[0]+1):last_index[1]])
+            
+            
+class Subject:
+    def __init__(self,et_file_path,beh_file_path):
+        self.et = et_file_path
+        self.beh = beh_file_path
+        self.subject_nr = get_subject_nr(et_file_path)
+        self.read_clean_files()
+
+    
+    def read_clean_files(self):
+        #Load and create the dataframes
+        self.et = check_et(self.et,self.subject_nr) #Clean et of any possible errors and return the dataframe - et had problems with the file
+        self.beh = pd.read_csv(self.beh)
+        self.beh = self.beh.loc[:,["CBcond","Gamble","domain","X_location","risk_selected","response_time"]]
+
+    def get_trials(self):
+        #Loop though the indexes and take only the indexes the start and end gamble
+        trials = []
+        trials_indexes = [] # Here we store the tuples with the start-end indexes
+        ph = 0 #A place holder for start-gamble index
+        ####
+        column_names = list(self.et.columns.values) #Check later!!!!!!!!
+        self.et = self.et.loc[:,["TimeStamp","Event","GazePointX","GazePointY"]]
+        #####
+        for i in self.et.index:          
+            #row_values = get_row_values(i,self.et,column_names)      
+            val = self.et.at[i,"Event"] # The value at the current cell
+            if "gamble" in str(val):       
+                if ph != 0:   # if ph !=0 then ph is start-gamble
+                    trials_indexes.append((ph,i)) #Append the ph and the current index
+                    ph = 0 #Reset
+                else: # If ph is 0 then take the index of start-gamble
+                    ph = i 
+                    
+        for trial_index in trials_indexes:
+            trials.append(pd.DataFrame(self.et.iloc[(trial_index[0]+1):trial_index[1]]))
+            
+        return trials
+ 
+    
+
+    def get_beh_data(self,current_trial_index):
+        x_loc = self.beh.at[current_trial_index,"X_location"]
+        response_time = self.beh.at[current_trial_index,"response_time"]
+        domain = self.beh.at[current_trial_index,"domain"]
+        gamble_nr = self.beh.at[current_trial_index,"Gamble"]   
+        risk = self.beh.at[current_trial_index,"risk_selected"]
+        return x_loc,response_time,domain,gamble_nr,risk
+        
+    def get_output(self):# this should be main method to return the dataframe for this current subject with all of his trials processed
+        print("Cheese")
+        print(len(self.get_trials()))
+        trials = self.get_trials()
+        
+        subject_table = []
+        for i,trial in enumerate(trials):
+            
+            beh_data = self.get_beh_data(i)
+            fixations = get_fixations(trial)
+            AOIs = get_AOIs(fixations,beh_data[0])       
+            row = [self.subject_nr] + [beh_data[3]] + [beh_data[2]] + AOIs + [beh_data[4]]+[beh_data[1]]
+            
+            subject_table.append(row)
+            
+        return subject_table
+            
+
+        
 
 
-#Main     
-op = main()
-
-subject_15 = pd.DataFrame(op)
-subject_15.columns = ["Subject","Gamble","Domain","p_Meanfix","q_Meanfix","x_Meanfix","y_Meanfix","p_TotalFix","q_TotalFix","x_TotalFix","y_TotalFix","risk_selected","response_time"]
 
 
+def main():
 
-#Export the dataset
-subject_15.to_csv("Subject-AOIs.csv", index = False)
+    # Get the list of subjects from the current folder
+    subject_list = get_subjects()
+
+    test = Subject('subject-16_TOBII_output.tsv','subject-16.csv')
+    subject_raw = test.get_output()
+
+    subject = pd.DataFrame(subject_raw)
+    subject.columns = ["Subject","Gamble","Domain","p_Meanfix","q_Meanfix","x_Meanfix","y_Meanfix","p_TotalFix","q_TotalFix","x_TotalFix","y_TotalFix","risk_selected","response_time"]
+    
+    
+    #Loop though the list of subjects to create the subjects
+    for subject_files in subject_list:
+        pass
+        #print(type(subject_files))
+        #print("Subject files: "subject_files)
+        
+        # Add the subject ouput to the final table
+
+    return subject
+
+
+
+
+#Start the program
+start = time.time() 
+
+
+final = main()
 
 
 end = time.time()  

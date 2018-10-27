@@ -133,6 +133,10 @@ def main(et_path,beh_path):
     #print("got the trials")
     #print(len(trials))
     for f in trials: 
+        AOI_p = []
+        AOI_q = []
+        AOI_x = []
+        AOI_y = []
         
         #Using the tuple, use start index and end index to create a trial
         
@@ -321,7 +325,7 @@ for s in v:
 print("Finished with the program")
 
 #Export the dataset
-finalDf.to_csv("All-Subjects-AOIs.csv", index = False)
+finalDf.to_csv("All-Subjects-AOIs_FIX1.csv", index = False)
 
 
 end = time.time()  
