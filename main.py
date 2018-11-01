@@ -8,7 +8,8 @@ import os
 
 
 #Misc
-def get_row_values(i,et,column_names):
+def get_row_values(i,df,column_names):
+    column_names = list(self.df.columns.values)
     temp_list = []
     for column in column_names:
         value = et.at[i,column] # The value at the current cell
@@ -26,21 +27,30 @@ def get_subject_nr(subject_path): # Return the subject number from the file name
 
 def get_subjects(): # Gets a list where every element is the subject beh and their et data
     fullList = os.listdir()
+    
     subject_numbers = {}
     subject_pairs = []
 
     for v in fullList:
         if "subject" in v:
-            nr = get_subject_nr(v)
-            subject_numbers[v]=nr
-            
+            try:
+                nr = get_subject_nr(v)
+                subject_numbers[v]=nr
+            except ValueError:
+                print("ERROR ! Check if you have any file named subject without number")
+                
+                
     for key, value in subject_numbers.items():
         for key2,value2 in subject_numbers.items(): #Loop though the dictionary
             if key != key2: # If key are named differently
                 if value == value2:#If they have the same value
                     if (key2,key) not in subject_pairs:
                         subject_pairs.append((key,key2))
-                        #print(key,key2)
+                        #print((key,key2)) 
+                        
+            
+    
+                       #print(key,key2)
     return subject_pairs
 
 #Fix functions
@@ -54,7 +64,7 @@ def replace_line(subject_path,badIndex): #Replace or remove the bad line of the 
     del f
     
     if "gamble" in badLine: #If that bad line contains gamble then try to replace
-        #print("REPLACING")
+        print("REPLACING")
         template = "    "+"\t"+"gamble"
         data[badIndex-1] = template
         with open(subject_path, 'w') as fileG:
@@ -62,7 +72,7 @@ def replace_line(subject_path,badIndex): #Replace or remove the bad line of the 
             del fileG
 
     else: # If is not gamble then remove it
-        #print("REMOVING")
+        print("REMOVING")
         template = "    "											
         data[badIndex-1] = template
         with open(subject_path, 'w') as fileB:
@@ -83,6 +93,7 @@ def check_et(et_path,subject_nr): # This function will verify the et file for an
             et = pd.read_csv(et_path,sep="\t",skiprows=17)
             temp = True
         except pd.errors.ParserError as e:
+            print(e)
             print("Subject %d has a bad line, trying to fix."%subject_nr)
             badIndex = get_badIndex(e) # Get the index of where the error was
             replace_line(et_path,badIndex) # Replace the error line with good or bad
@@ -251,6 +262,8 @@ class Subject:
         trials = []
         trials_indexes = [] # Here we store the tuples with the start-end indexes
         ph = 0 #A place holder for start-gamble index
+        
+        temp_values = []
         ####
         column_names = list(self.et.columns.values) #Check later!!!!!!!!
         self.et = self.et.loc[:,["TimeStamp","Event","GazePointX","GazePointY"]]
@@ -258,13 +271,18 @@ class Subject:
         for i in self.et.index:          
             #row_values = get_row_values(i,self.et,column_names)      
             val = self.et.at[i,"Event"] # The value at the current cell
-            if "gamble" in str(val):       
+            if "gamble" in str(val):   
+                if self.subject_nr == 14:
+                    print(val)
+                temp_values.append(val)
                 if ph != 0:   # if ph !=0 then ph is start-gamble
                     trials_indexes.append((ph,i)) #Append the ph and the current index
                     ph = 0 #Reset
                 else: # If ph is 0 then take the index of start-gamble
                     ph = i 
                     
+      
+        print(self.subject_nr,len(trials_indexes))           
         for trial_index in trials_indexes:
             trials.append(pd.DataFrame(self.et.iloc[(trial_index[0]+1):trial_index[1]]))
             
@@ -281,8 +299,8 @@ class Subject:
         return x_loc,response_time,domain,gamble_nr,risk
         
     def get_output(self):# this should be main method to return the dataframe for this current subject with all of his trials processed
-        print("Cheese")
-        print(len(self.get_trials()))
+        
+        
         trials = self.get_trials()
         
         subject_table = []
@@ -309,23 +327,25 @@ def main():
 
     # Get the list of subjects from the current folder
     subject_list = get_subjects()
+    finalDf = pd.DataFrame() 
 
-    subject = Subject('subject-16_TOBII_output.tsv','subject-16.csv')
-    subject_raw = test.get_output()
-    subject = pd.DataFrame(subject_raw)
-    subject.columns = ["Subject","Gamble","Domain","p_Meanfix","q_Meanfix","x_Meanfix","y_Meanfix","p_TotalFix","q_TotalFix","x_TotalFix","y_TotalFix","risk_selected","response_time"]
+    #subject = Subject('subject-16_TOBII_output.tsv','subject-16.csv')
+    #subject_raw = subject.get_output()
+    #subject = pd.DataFrame(subject_raw)
+    #subject.columns = ["Subject","Gamble","Domain","p_Meanfix","q_Meanfix","x_Meanfix","y_Meanfix","p_TotalFix","q_TotalFix","x_TotalFix","y_TotalFix","risk_selected","response_time"]
     
     
     #Loop though the list of subjects to create the subjects
     for subject_files in subject_list:
-        pass
-        #subject = Subject('subject-16_TOBII_output.tsv','subject-16.csv')
-        #subject_raw = test.get_output()
-        #subject = pd.DataFrame(subject_raw)
-        #subject.columns = ["Subject","Gamble","Domain","p_Meanfix","q_Meanfix","x_Meanfix","y_Meanfix","p_TotalFix","q_TotalFix","x_TotalFix","y_TotalFix","risk_selected","response_time"]
+        #print(subject_files[1],subject_files[0])
+        subject = Subject(subject_files[1],subject_files[0])
+        subject_raw = subject.get_output()
+        subject = pd.DataFrame(subject_raw)
+        subject.columns = ["Subject","Gamble","Domain","p_Meanfix","q_Meanfix","x_Meanfix","y_Meanfix","p_TotalFix","q_TotalFix","x_TotalFix","y_TotalFix","risk_selected","response_time"]
+        finalDf = pd.concat([finalDf, subject])
     
 
-    return subject
+    return finalDf
 
 
 
@@ -334,7 +354,7 @@ def main():
 start = time.time() 
 
 
-final = main()
+FinalOutput = main()
 
 
 end = time.time()  
