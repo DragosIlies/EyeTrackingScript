@@ -105,7 +105,9 @@ def get_fixations(df): #GEt the fixations for the given dataframe
     dfListX = df["GazePointX"].tolist()
     dfListY = df["GazePointY"].tolist()
     dfListT = df["TimeStamp"].tolist()
+    
     dfListX =list(map(float, dfListX))
+    
     dfListY =list(map(float, dfListY))
     dfListT =list(map(float, dfListT))
 
@@ -271,9 +273,7 @@ class Subject:
         for i in self.et.index:          
             #row_values = get_row_values(i,self.et,column_names)      
             val = self.et.at[i,"Event"] # The value at the current cell
-            if "gamble" in str(val):   
-                if self.subject_nr == 14:
-                    print(val)
+            if "gamble" in str(val): 
                 temp_values.append(val)
                 if ph != 0:   # if ph !=0 then ph is start-gamble
                     trials_indexes.append((ph,i)) #Append the ph and the current index
@@ -281,8 +281,10 @@ class Subject:
                 else: # If ph is 0 then take the index of start-gamble
                     ph = i 
                     
-      
-        print(self.subject_nr,len(trials_indexes))           
+        if len(trials_indexes) < 150:
+            print("Subject nr",self.subject_nr)
+            find_bad(temp_values)           
+        #print(self.subject_nr,len(trials_indexes))           
         for trial_index in trials_indexes:
             trials.append(pd.DataFrame(self.et.iloc[(trial_index[0]+1):trial_index[1]]))
             
@@ -302,11 +304,10 @@ class Subject:
         
         
         trials = self.get_trials()
-        
+        print(len(trials))
         subject_table = []
         for i,trial in enumerate(trials):
             beh_data = self.get_beh_data(i)
-            
             fixations = get_fixations(trial)
             AOIs = get_AOIs(fixations,beh_data[0])       
             
@@ -318,6 +319,18 @@ class Subject:
         return subject_table
             
 
+def find_bad(bList):
+    print(len(bList))
+    sM = [] 
+    for v in bList:
+        sM.append(get_subject_nr(v))
+        
+    for n in sM:
+        cr = sM.count(n)
+        if cr < 4:
+            print(n)
+        
+        
         
 
 
@@ -356,6 +369,8 @@ start = time.time()
 
 FinalOutput = main()
 
+#Export the dataset
+FinalOutput.to_csv("Final-Output.csv", index = False)
 
 end = time.time()  
 print("Program ended and it took: ",end-start)
