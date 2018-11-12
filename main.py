@@ -48,11 +48,14 @@ def main():
     
     #Loop though the list of subjects to create the subjects
     for subject_files in subject_list:
+        
+        print("Processing subject: ",get_subject_nr(subject_files[1]))
+        
         subject = Subject(subject_files[1],subject_files[0],get_subject_nr(subject_files[1])) #Create the subject object with the et and beh files
         subject_raw = subject.get_output()   # Get a table with all the information from the table
         # Create an empty table using pandas and set the column names
         subject = pd.DataFrame(subject_raw) 
-        subject.columns = ["Subject","Gamble","Domain","p_Meanfix","q_Meanfix","x_Meanfix","y_Meanfix","p_TotalFix","q_TotalFix","x_TotalFix","y_TotalFix","risk_selected","response_time"]
+        subject.columns = ["Subject","Gamble","Domain","p_Meanfix","q_Meanfix","x_Meanfix","y_Meanfix","p_TotalFix","q_TotalFix","x_TotalFix","y_TotalFix","Good Fix %","Bad Fix %","Good X %","Good Y %","risk_selected","response_time"]
         #Add the new table with the old one by combining them using pandas
         final_output = pd.concat([final_output, subject])
     
@@ -69,7 +72,7 @@ start = time.time()
 FinalOutput = main()
 
 #Export the table to a csv file
-FinalOutput.to_csv("Final-Output.csv", index = False)
+#FinalOutput.to_csv("Final-Output.csv", index = False)
 
 end = time.time()  
 print("Program ended and it took: ",end-start)

@@ -65,7 +65,7 @@ class Trial: # This class creates an object with every table trial from the subj
         self.x_loc = x_loc
         
         
-    def get_fixations(self): #GEt the fixations for the given dataframe       
+    def get_fixations_samples(self): #GEt the fixations for the given dataframe       
     
         #Convert the necessary rows to list so they can be used by the fixation algorithm
         dfListX = self.dataframe["GazePointX"].tolist() 
@@ -75,14 +75,43 @@ class Trial: # This class creates an object with every table trial from the subj
         dfListX =list(map(float, dfListX))
         dfListY =list(map(float, dfListY))
         dfListT =list(map(float, dfListT))
+        
+        
+        #Take the X and Y samples
+        gazeX_samples = dfListX 
+        gazeY_samples = dfListY
+        
     
+        subject_totalX = len(gazeX_samples)
+        subject_totalY = len(gazeY_samples)
+    
+        subject_goodX = []
+        subject_goodY = []
+        
+        
+        #Add the good samples to a list of good samples
+        for vX in gazeX_samples:
+            if vX > 0:
+                subject_goodX.append(vX)
+        
+        
+        for vY in gazeY_samples:
+            if vY > 0:
+                subject_goodY.append(vY) 
+
+        #Calculate the percentange
+        percx_good = (len(subject_goodX) /len(gazeX_samples))*100
+        percy_good = (len(subject_goodY) /len(gazeY_samples))*100
+        
+
         
         results = fixation_detection(dfListX, dfListY, dfListT, missing=0.0, maxdist=25, mindur=16.7) # Calculate the fixations
         fixations = results[1]
         
-        return fixations
+        #Return the fixations and the samples data
+        return [fixations] + [percx_good] +[percy_good] +[len(subject_goodX)] + [len(subject_goodY)]
     
-    def get_AOI_MT(self,AOI_p,AOI_q,AOI_x,AOI_y): #Return the the mean and total of the AOIs
+    def get_AOI_MT(self,AOI_p,AOI_q,AOI_x,AOI_y): #Return the the mean and total of the AOIs_perc
 
         #calculate the means
         p_Meanfix = mean(AOI_p)  
@@ -100,8 +129,16 @@ class Trial: # This class creates an object with every table trial from the subj
         return [p_Meanfix,q_Meanfix,x_Meanfix,y_Meanfix,p_TotalFix,q_TotalFix,x_TotalFix,y_TotalFix]
                 
     
-    def get_AOIs(self):
-        fixations = self.get_fixations()
+    def get_AOIs_perc_Perc(self):
+        fixations_samples = self.get_fixations_samples()
+        
+        fixations = fixations_samples[0]
+        
+        
+        
+        total_fixations = 0
+        bad_fixations = 0
+        
         AOI_p = []
         AOI_x = []
         AOI_q = []
@@ -113,24 +150,30 @@ class Trial: # This class creates an object with every table trial from the subj
                 
                 #AOI 1 coordonates
                 a1x_up = 944
-                a1y_up = 524
                 a1x_low = 656
+                
+                a1y_up = 524
                 a1y_low = 236
                 
                 #AOI 2 coordonates
                 a2x_up = 1264
-                a2y_up = 524
                 a2x_low = 976
+                
+                a2y_up = 524
                 a2y_low = 236
+                
                 #AOI 3 coordonates
                 a3x_up = 944
-                a3y_up = 844
                 a3x_low = 656
+                
+                a3y_up = 844
                 a3y_low = 556
+                
                 #AOI 4 coordonates
-                a4x_up = 1264
-                a4y_up = 844
+                a4x_up = 1264               
                 a4x_low = 976
+                
+                a4y_up = 844
                 a4y_low = 556
                 
                 
@@ -205,10 +248,35 @@ class Trial: # This class creates an object with every table trial from the subj
                         #add to x
                     elif self.x_loc == 4:
                         AOI_p.append(duration)
+
                         
-        #After every fixation has been put in their particular AOI process and return the AOIs
-        AOIs = self.get_AOI_MT(AOI_p,AOI_q,AOI_x,AOI_y)
-        return AOIs
+        
+        #Bad and Good fixations
+        total_fixations = len(fixations)
+        good_fixations = len(AOI_p)+len(AOI_q)+len(AOI_x)+len(AOI_y)
+        bad_fixations = total_fixations - good_fixations
+        
+
+            
+        #Percentage for good and bad fixations
+        if good_fixations != 0 or total_fixations != 0:
+            perc_good_fix = ((good_fixations/total_fixations)*100)
+        else:
+            perc_good_fix = 0
+        
+        if bad_fixations != 0 or total_fixations != 0:
+            perc_bad_fix = ((bad_fixations/total_fixations)*100)
+        else:
+            perc_bad_fix = 0
+            
+            
+       
+        
+        #After every fixation has been put in their particular AOI process and return the AOIs_perc
+        AOIs_perc = self.get_AOI_MT(AOI_p,AOI_q,AOI_x,AOI_y)
+        
+        #Return the AOI, percentanges for fixations and samples data
+        return [AOIs_perc] + [perc_good_fix] + [perc_bad_fix] + fixations_samples[1:3]
     
         
 
@@ -265,7 +333,7 @@ class Subject:
         
     def get_output(self):# this should be main method to return the dataframe for this current subject with all of his trials processed
         
-        trials = self.get_trials() # Get the trias found from the subject table
+        trials = self.get_trials() # Get the trials found from the subject table
         subject_table = []
         
         #Go through the trials tables and create a trial object, return the row for that trial
@@ -275,9 +343,9 @@ class Subject:
             
             current_trial = Trial(trial,beh_data[0]) # Create an trial object with the trial table and the current x_loc
 
-            AOIs = current_trial.get_AOIs() # Get the AOIs from that trial
+            AOIs_perc = current_trial.get_AOIs_perc_Perc() # Get the AOIs_perc from that trial
             
-            row = [self.subject_nr] + [beh_data[3]] + [beh_data[2]] + AOIs + [beh_data[4]]+[beh_data[1]] # Create the trial row using the AOI and the values extracted from beh
+            row = [self.subject_nr] + [beh_data[3]] + [beh_data[2]] + AOIs_perc[0]  + [AOIs_perc[1]] + [AOIs_perc[2]] + [AOIs_perc[3]] + [AOIs_perc[4]] + [beh_data[4]]+[beh_data[1]] # Create the trial row using the AOI and the values extracted from beh
             
             subject_table.append(row) # Add the row to the subject table
             
