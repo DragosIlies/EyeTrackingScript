@@ -72,7 +72,7 @@ start = time.time()
 FinalOutput = main()
 
 #Export the table to a csv file
-#FinalOutput.to_csv("Final-Output.csv", index = False)
+FinalOutput.to_csv("Final-Output.csv", index = False)
 
 end = time.time()  
 print("Program ended and it took: ",end-start)

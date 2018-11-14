@@ -48,7 +48,7 @@ def check_et(et_path,subject_nr): # This function will verify the et file for an
     temp = False 
     while temp == False: # Continuosly try to read the file, if worked then stop, otherwise try to fix it
         try:
-            et = pd.read_csv(et_path,sep="\t",skiprows=17) # Read the tab separated file with pandas and skip the first 17 rows
+            et = pd.read_csv(et_path,sep="\t",skiprows=17,low_memory=False) # Read the tab separated file with pandas and skip the first 17 rows
             temp = True # no more bad lines in the code
         except pd.errors.ParserError as e:
             print("Subject %d has a bad line, trying to fix."%subject_nr)
@@ -316,7 +316,9 @@ class Subject:
                     ph = 0 #Reset
                 else: # If ph is 0 then take the index of start-gamble
                     ph = i 
-          
+        
+        if len(trials_indexes) < 150 :
+            print("Warning! Subject %d has %d trials instead of 150 "%(self.subject_nr,len(trials_indexes)))
         for trial_index in trials_indexes:
             trials.append(pd.DataFrame(self.et.iloc[(trial_index[0]+1):trial_index[1]])) #Add the trial table to a list of table trials
                                                                                     # "iloc" is similiar to loc but it uses indexes, in this case the start and end of a particular trial in the et table 
